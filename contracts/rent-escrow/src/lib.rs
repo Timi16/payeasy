@@ -114,11 +114,7 @@ impl RentEscrowContract {
             .get(&DataKey::Escrow)
             .expect("escrow not initialized");
 
-        let mut total: i128 = 0;
-        for (_, amount) in escrow.contributions.iter() {
-            total += amount;
-        }
-        total >= escrow.rent_amount
+        Self::get_total_funded(env.clone()) >= escrow.rent_amount
     }
 
     /// Release total rent to the landlord if fully funded.
