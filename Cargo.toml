@@ -9,7 +9,6 @@ opt-level = "z"
 overflow-checks = true
 debug = false
 panic = "abort"
-# Optimize for size
 codegen-units = 1
 lto = true
 
