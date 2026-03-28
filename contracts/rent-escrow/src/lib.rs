@@ -8,7 +8,6 @@ pub const MIN_RENT: i128 = 100;
 /// (24 * 60 * 60) / 5 = 17280
 pub const DAY_IN_LEDGERS: u32 = 17280;
 
-//RentEscrow defined already
 /// Error types for the rent escrow contract.
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -22,8 +21,6 @@ pub enum Error {
 }
 
 /// Storage key definitions for persistent contract state.
-///
-/// Using a `#[contracttype]` enum guarantees type-safe, collision-free keys.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
@@ -53,9 +50,6 @@ pub struct RentEscrowContract;
 #[contractimpl]
 impl RentEscrowContract {
     /// Initialize the escrow with landlord, rent amount, and roommates.
-    ///
-    /// Persists the escrow state to ledger storage so that the values
-    /// survive across invocations and ledger closes.
     pub fn initialize(
         env: Env,
         landlord: Address,
@@ -89,9 +83,6 @@ impl RentEscrowContract {
     }
 
     /// Allows the landlord to register a new roommate and their expected share.
-    ///
-    /// Only the landlord may call this. Reverts with `Unauthorized` if anyone
-    /// else attempts to add a roommate.
     pub fn add_roommate(
         env: Env,
         landlord: Address,
@@ -109,7 +100,6 @@ impl RentEscrowContract {
             .get(&DataKey::Escrow)
             .expect("escrow not initialized");
 
-        // Only the stored landlord is authorised to modify the roommate list.
         if escrow.landlord != landlord {
             return Err(Error::Unauthorized);
         }
@@ -137,7 +127,6 @@ impl RentEscrowContract {
             .get(&DataKey::Escrow)
             .expect("escrow not initialized");
 
-        // Verify the caller is a registered roommate before accepting any funds.
         if !escrow.roommates.contains_key(from.clone()) {
             return Err(Error::Unauthorized);
         }
@@ -177,12 +166,7 @@ impl RentEscrowContract {
     }
 
     /// Release total rent to the landlord if fully funded.
-    ///
-    /// Guard: delegates to `is_fully_funded` at the start of the function.
-    /// Any call made before all roommates have met the rent target is
-    /// rejected with `Error::InsufficientFunding`, preventing premature payout.
     pub fn release(env: Env) -> Result<(), Error> {
-        // Guard: must be fully funded before any payout can occur.
         if !Self::is_fully_funded(env.clone()) {
             return Err(Error::InsufficientFunding);
         }
@@ -192,18 +176,16 @@ impl RentEscrowContract {
         Ok(())
     }
 
-    /// Retrieve the landlord address from persistent storage.
+    /// Retrieve the landlord address.
     pub fn get_landlord(env: Env) -> Address {
         let escrow: RentEscrow = env.storage()
             .persistent()
             .get(&DataKey::Escrow)
-            .expect("escrow not initialized; call initialize first");
+            .expect("escrow not initialized");
         escrow.landlord
     }
 
-    /// Retrieve the current rent amount from persistent storage.
-    ///
-    /// Returns 0 if the escrow has not been initialized.
+    /// Retrieve the rent amount.
     pub fn get_amount(env: Env) -> i128 {
         let result: Option<RentEscrow> = env.storage()
             .persistent()
@@ -227,7 +209,7 @@ impl RentEscrowContract {
         }
     }
 
-    /// Retrieve the deadline timestamp from persistent storage.
+    /// Retrieve the deadline timestamp.
     pub fn get_deadline(env: Env) -> u64 {
         env.storage()
             .persistent()
@@ -235,8 +217,7 @@ impl RentEscrowContract {
             .expect("escrow not initialized")
     }
 
-    /// Implement function for individual roommates to reclaim deposits.
-    /// Reverts if called before the deadline.
+    /// Allow roommates to reclaim deposits after deadline.
     pub fn claim_refund(env: Env, from: Address) -> Result<(), Error> {
         from.require_auth();
 
@@ -258,8 +239,8 @@ impl RentEscrowContract {
             return Err(Error::Unauthorized);
         }
 
-        // Logic to transfer token back to user will be added here
-        
+        // TODO: Transfer token back to user
+
         Ok(())
     }
 }
