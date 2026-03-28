@@ -106,3 +106,44 @@ fn test_stranger_contribute_fails() {
         "expected contribute to fail for an unregistered address"
     );
 }
+
+/// Issue #21 – add_roommate: success path
+///
+/// The landlord can register a brand-new roommate after initialisation.
+/// The new address should then be visible through `get_balance`.
+#[test]
+fn test_add_roommate_by_landlord_succeeds() {
+    let env = Env::default();
+    let (client, landlord, _, _) = setup_escrow(&env);
+
+    let new_roommate = Address::generate(&env);
+
+    // Landlord adds a new roommate with a share of 250.
+    client.add_roommate(&landlord, &new_roommate, &250_i128);
+
+    // Newly added roommate starts with no paid balance.
+    assert_eq!(client.get_balance(&new_roommate), 0_i128);
+
+    // After contributing, their balance should reflect the payment.
+    client.contribute(&new_roommate, &100_i128);
+    assert_eq!(client.get_balance(&new_roommate), 100_i128);
+}
+
+/// Issue #21 – add_roommate: non-landlord call must fail
+///
+/// Any caller whose address is not the stored landlord must be rejected
+/// with `Error::Unauthorized`.
+#[test]
+fn test_add_roommate_by_non_landlord_fails() {
+    let env = Env::default();
+    let (client, _, roommate_a, _) = setup_escrow(&env);
+
+    let new_roommate = Address::generate(&env);
+
+    // roommate_a is not the landlord — this must revert.
+    let result = client.try_add_roommate(&roommate_a, &new_roommate, &250_i128);
+    assert!(
+        result.is_err(),
+        "expected add_roommate to fail for a non-landlord caller"
+    );
+}

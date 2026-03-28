@@ -82,6 +82,42 @@ impl RentEscrowContract {
         Ok(())
     }
 
+    /// Allows the landlord to register a new roommate and their expected share.
+    ///
+    /// Only the landlord may call this. Reverts with `Unauthorized` if anyone
+    /// else attempts to add a roommate.
+    pub fn add_roommate(
+        env: Env,
+        landlord: Address,
+        user: Address,
+        share: i128,
+    ) -> Result<(), Error> {
+        landlord.require_auth();
+
+        if share <= 0 {
+            return Err(Error::InvalidAmount);
+        }
+
+        let mut escrow: RentEscrow = env.storage()
+            .persistent()
+            .get(&DataKey::Escrow)
+            .expect("escrow not initialized");
+
+        // Only the stored landlord is authorised to modify the roommate list.
+        if escrow.landlord != landlord {
+            return Err(Error::Unauthorized);
+        }
+
+        escrow.roommates.set(user, RoommateState {
+            expected: share,
+            paid: 0,
+        });
+
+        env.storage().persistent().set(&DataKey::Escrow, &escrow);
+
+        Ok(())
+    }
+
     /// Roommates call this to contribute their share of the rent.
     pub fn contribute(env: Env, from: Address, amount: i128) -> Result<(), Error> {
         if amount <= 0 {
