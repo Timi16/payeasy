@@ -19,6 +19,7 @@ pub enum Error {
     Unauthorized = 3,
     /// Refunds are not available until the deadline has passed.
     DeadlineNotReached = 4,
+    /// Roommate has no contributed balance to refund.
     /// No funds to refund for this roommate.
     NothingToRefund = 5,
 }
@@ -71,6 +72,10 @@ pub struct RentEscrowContract;
 #[contractimpl]
 impl RentEscrowContract {
     /// Initialize the escrow with landlord, token, rent amount, deadline, and roommates.
+    pub fn initialize(
+        env: Env,
+        landlord: Address,
+        token: Address,
     pub fn initialize(
         env: Env,
         landlord: Address,
@@ -182,6 +187,27 @@ impl RentEscrowContract {
 
         env.storage().persistent().set(&DataKey::Escrow, &escrow);
 
+        Ok(())
+    }
+
+    /// Refund a roommate's contributed balance back to them.
+    pub fn refund(env: Env, roommate: Address) -> Result<(), Error> {
+        roommate.require_auth();
+        let mut escrow: RentEscrow = env.storage()
+            .persistent()
+            .get(&DataKey::Escrow)
+            .expect("escrow not initialized");
+        let state = escrow.roommates.get(roommate.clone()).ok_or(Error::Unauthorized)?;
+        let contributed = state.paid;
+        if contributed <= 0 {
+            return Err(Error::NothingToRefund);
+        }
+        let mut new_state = state.clone();
+        new_state.paid = 0;
+        escrow.roommates.set(roommate.clone(), new_state);
+        env.storage().persistent().set(&DataKey::Escrow, &escrow);
+        let token_client = token::TokenClient::new(&env, &escrow.token);
+        token_client.transfer(&env.current_contract_address(), &roommate, &contributed);
         Ok(())
     }
 
