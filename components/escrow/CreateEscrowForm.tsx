@@ -9,6 +9,7 @@ import { getExplorerLink, type ExplorerProvider } from "@/lib/stellar/explorer";
 import { useFormDraft } from "@/hooks/useFormDraft";
 import RoommateInput from "./RoommateInput";
 import {
+  calculateRemainingAmount,
   hasExactShareAllocation,
   nextEscrowStep,
   previousEscrowStep,
@@ -149,6 +150,11 @@ export default function CreateEscrowForm({
   const deadlineLedgerTimestamp = useMemo(
     () => toLedgerTimestamp(draft.deadlineDate),
     [draft.deadlineDate]
+  );
+
+  const remainingAmount = useMemo(
+    () => calculateRemainingAmount(draft.totalRent, draft.roommates),
+    [draft.totalRent, draft.roommates]
   );
 
   const currentStepLabel = STEP_LABELS[step - 1];
@@ -384,6 +390,7 @@ export default function CreateEscrowForm({
                   key={roommate.id}
                   roommate={roommate}
                   index={index}
+                  totalRent={draft.totalRent}
                   onChange={handleRoommateChange}
                   onRemove={handleRoommateRemove}
                   disableRemove={draft.roommates.length === 1}
@@ -407,6 +414,9 @@ export default function CreateEscrowForm({
             <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-dark-400 space-y-1">
               <p>Total rent: {draft.totalRent || "0"}</p>
               <p>Total roommate shares: {totalRoommateShares.toFixed(7).replace(/\.0+$/, "")}</p>
+              <p className={remainingAmount < 0 ? "text-red-400 font-medium" : ""}>
+                Remaining: {remainingAmount.toFixed(7).replace(/\.?0+$/, "")} {draft.tokenId || "XLM"}
+              </p>
               <p className={sharesMatchTotal ? "text-accent-300" : "text-red-300"}>
                 {sharesMatchTotal
                   ? "Share allocation is valid."
